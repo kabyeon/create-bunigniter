@@ -8,7 +8,6 @@
   },
   "files": [
     "src/",
-    "templates/",
     "README.md"
   ],
   "scripts": {
@@ -19,10 +18,10 @@
     "bun": ">=1.3.0"
   },
   "license": "MIT",
-  "homepage": "https://github.com/nexus-ts/bunigniter",
+  "homepage": "https://github.com/nexus-ts/create-bunigniter",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nexus-ts/bunigniter.git"
+    "url": "git+https://github.com/nexus-ts/create-bunigniter.git"
   },
   "keywords": [
     "bun",
