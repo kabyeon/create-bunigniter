@@ -905,6 +905,7 @@ async function main() {
 		console.log(`    bun run seed         ${D("# Create database & seed data")}`)
 		console.log(`    bun run dev          ${D("# Start dev server at :3000")}`)
 	}
+	console.log(`    DEBUG=true bun run dev ${D("# Enable debug toolbar with SQL profiler")}`)
 	console.log()
 	console.log(`  ${D("Open http://localhost:3000 in your browser.")}`)
 	console.log()
