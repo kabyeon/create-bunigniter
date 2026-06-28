@@ -99,8 +99,8 @@ function pkgJson(name: string) {
 				dev: "bun --hot run dev.ts",
 				start: "bun run dev.ts",
 				seed: "bun run db/seed.ts",
-				bi: "bun run bi",
-				"bi:repl": "bun run bi repl",
+				bi: "bun run node_modules/bunigniter/dist/cli/index.ts",
+				"bi:repl": "bun run node_modules/bunigniter/dist/cli/index.ts repl",
 			},
 			dependencies: {
 				bunigniter: "^0.4",
