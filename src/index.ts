@@ -28,6 +28,7 @@ function prompt(query: string): Promise<string> {
 	return new Promise((resolve) => {
 		const onData = (data: Buffer) => {
 			process.stdin.removeListener("data", onData)
+			process.stdin.pause()
 			resolve(data.toString().trim())
 		}
 		process.stdin.resume()
