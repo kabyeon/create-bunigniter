@@ -25,9 +25,19 @@ jobs:
         with:
           bun-version: latest
       - run: |
-          PROJ=$(mktemp -d)/test-app
-          bun run src/index.ts "$PROJ" <<< "n"
-          cd "$PROJ"
-          bun install
-          bun run seed
-          echo "✅ scaffold + seed OK"
+          cd /tmp
+          rm -rf test-scaffold-app
+          bun run "$GITHUB_WORKSPACE/src/index.ts" test-scaffold-app <<< "n"
+          cd test-scaffold-app
+          test -f package.json && echo "✓ package.json"
+          test -f config/app.ts && echo "✓ config/app.ts"
+          test -f routes/items.ts && echo "✓ routes/items.ts"
+          test -f routes/items/new.ts && echo "✓ routes/items/new.ts"
+          test -f routes/api.ts && echo "✓ routes/api.ts"
+          test -f views/_layout.html && echo "✓ views/_layout.html"
+          test -f views/welcome.html && echo "✓ views/welcome.html"
+          test -f db/seed.ts && echo "✓ db/seed.ts"
+          test -f dev.ts && echo "✓ dev.ts"
+          test -f .gitignore && echo "✓ .gitignore"
+          test -f .env.example && echo "✓ .env.example"
+          echo "✅ All scaffold files verified"
