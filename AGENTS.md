@@ -83,7 +83,7 @@ bun create bunigniter my-app             # Bun 캐시 사용 가능
 | `genTsCfg()` | tsconfig.json |
 | `genGitignore()` | .gitignore |
 | `genEnvExample()` | .env.example |
-| `genDevEntry()` | dev.ts |
+| `genMainEntry()` | main.ts |
 | `genConfigApp()` | config/app.ts |
 | `genSeedScript()` | db/seed.ts (skipped if database=none) |
 | `genRouteIndex()` | routes/index.ts (Home controller) |
@@ -108,7 +108,7 @@ my-app/
 ├── views/
 │   ├── _layout.html        # Auto-layout wrapper
 │   └── welcome.html        # Welcome page template
-├── dev.ts                  # Entry point
+├── main.ts                  # Entry point
 ├── package.json            # Scripts: dev, seed, bi, repl
 ├── tsconfig.json           # TypeScript config
 ├── .gitignore              # Git ignore rules

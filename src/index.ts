@@ -64,15 +64,15 @@ function minPkgJson(name: string): string {
 			type: "module",
 			private: true,
 			scripts: {
-				dev: "bun --hot run dev.ts",
-				start: "bun run dev.ts",
+				dev: "bun --hot run main.ts",
+				start: "bun run main.ts",
 				bi: "bun run node_modules/bunigniter/dist/cli/index.ts",
 				"bi:repl": "bun run node_modules/bunigniter/dist/cli/index.ts repl",
 				"bi:new": "bun run node_modules/bunigniter/dist/cli/index.ts new",
 			},
 			dependencies: {
 				bunigniter: "^0.5",
-				elysia: "^2.0.0-exp.12",
+				elysia: "^2.0.0-exp.13",
 			},
 		},
 		null,

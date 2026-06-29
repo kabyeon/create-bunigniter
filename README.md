@@ -81,7 +81,7 @@ my-app/
 │   ├── _layout.html        # Auto-layout wrapper
 │   └── welcome.html        # Welcome page (Rendu template)
 ├── db/seed.ts              # SQLite seeder w/ sample data
-├── dev.ts                  # Entry point
+├── main.ts                  # Entry point
 ├── package.json            # Scripts: dev, seed, bi, repl
 ├── tsconfig.json           # TypeScript config
 ├── .gitignore              # Git ignore rules

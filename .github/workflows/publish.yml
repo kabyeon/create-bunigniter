@@ -42,7 +42,7 @@ jobs:
           for f in \
             package.json config/app.ts routes/index.ts \
             routes/api.ts views/_layout.html views/welcome.html \
-            db/seed.ts dev.ts tsconfig.json .gitignore .env.example; do
+            db/seed.ts main.ts tsconfig.json .gitignore .env.example; do
             test -f "$f" && echo "✓ $f" \
               || { echo "Missing: $f"; exit 1; }
           done
