@@ -41,16 +41,21 @@ export class Users extends Controller {
 ## Usage
 
 ```bash
-bun create bunigniter           # Interactive prompt
-bun create bunigniter my-app    # With project name
-npx create-bunigniter my-app    # npm alternative
+bun create bunigniter                 # Interactive prompt
+bun create bunigniter my-app          # With project name
+bun create bunigniter my-app --edge   # With Cloudflare Workers support
+npx create-bunigniter my-app          # npm alternative
 ```
 
-The CLI scaffolds a working project with CRUD, API handler, database seeder, and styled templates — 17 files ready to run.
+The CLI scaffolds a working project with CRUD, API handler, database seeder, and styled templates.
+
+**With the `--edge` (or `-e`) flag**, it also generates Cloudflare Workers deployment files — `wrangler.toml`, `src/worker.ts`, and `db/init.sql`.
 
 ---
 
 ## What you get
+
+### Default (Bun-only): 17 files
 
 ```
 my-app/
@@ -73,6 +78,16 @@ my-app/
 └── tsconfig.json           # JSX + Bundler resolution
 ```
 
+### With `--edge` flag: +3 additional files
+
+```
+my-app/
+├── ... (all files above) ...
+├── wrangler.toml           # Cloudflare Workers configuration + D1 binding
+├── src/worker.ts           # Edge worker entry point (Elysia + D1 + inline HTML)
+└── db/init.sql             # D1 database initialization script
+```
+
 ---
 
 ## What it demonstrates
@@ -87,24 +102,48 @@ my-app/
 | SQLite | `db/seed.ts` | Zero-config, auto-created |
 | Input validation | Controller | CI-style string rules or Zod schemas |
 | Request API | Controller | `this.request.only()`, `.get()`, `.post()`, `.has()`, etc. |
+| Edge deployment | `src/worker.ts` | Elysia + D1 + inline HTML on Cloudflare Workers |
+| D1 database | `db/init.sql` | SQLite-compatible serverless DB on Cloudflare |
 
 ---
 
 ## Quick Start
 
+### Local Development (Bun)
+
 ```bash
 cd my-app
-bun run seed      # Seed database (3 sample items)
-bun run dev       # Dev server at :3000
-bun run bi repl   # Interactive REPL with db, cache, http
-bun run bi list   # List all registered routes
+bun install           # Install dependencies
+bun run seed          # Seed database (3 sample items)
+bun run dev           # Dev server at :3000
+bun run bi repl       # Interactive REPL with db, cache, http
+bun run bi list       # List all registered routes
 ```
+
+### Cloudflare Workers Deployment (with `--edge`)
+
+```bash
+cd my-app
+bun install
+npx wrangler login                                          # Login to Cloudflare
+npx wrangler d1 create my-app-db                            # Create D1 database
+# → Copy the database_id into wrangler.toml
+
+bun run cf:db:init                                          # Initialize D1 tables
+bun run cf:dev                                              # Local dev at :8787
+bun run cf:deploy                                           # Deploy to Cloudflare
+```
+
+> **Note:** The `src/worker.ts` is a separate entry point for Cloudflare Workers.
+> The local Bun server (`bun run dev`) and the Cloudflare Worker (`wrangler dev`)
+> run independently — changes to one don't affect the other.
 
 ---
 
 ## Requirements
 
-- [Bun](https://bun.sh) >= 1.3.0
+- [Bun](https://bun.sh) >= 1.3.0 (for local development)
+- [Wrangler](https://developers.cloudflare.com/workers/wrangler/) (for Cloudflare deployment — installed automatically with `--edge`)
 
 ---
 
@@ -120,6 +159,17 @@ bun run bi list   # List all registered routes
 | OpenAPI | Auto-generated at `/openapi` with Scalar UI |
 | CLI | `bun run bi make:controller`, `make:model`, etc. |
 | Edge | `bun run bi build:edge` for Cloudflare Workers |
+
+### Cloudflare Workers
+
+| Topic | Guide |
+|-------|-------|
+| Deploy | `bun run cf:deploy` |
+| D1 Console | `npx wrangler d1 execute my-app-db --command "SELECT * FROM items"` |
+| D1 Dashboard | [cloudflare.com](https://dash.cloudflare.com/) → Workers & Pages → D1 |
+| Environment | Set `CORS_ORIGIN`, `DEBUG` in `wrangler.toml` under `[vars]` |
+| Custom Domain | Add `routes = ["example.com/*"]` to `wrangler.toml` |
+| Logs | `npx wrangler tail` for real-time logs |
 
 Full documentation: [github.com/nexus-ts/bunigniter](https://github.com/nexus-ts/bunigniter)
 

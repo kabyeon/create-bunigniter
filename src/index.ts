@@ -4,10 +4,14 @@
  *
  * Usage:
  *   bun create bunigniter <project-name>
+ *   bun create bunigniter <project-name> --edge
  *   bun x create-bunigniter <project-name>
  *   npx create-bunigniter <project-name>
  *
  * If <project-name> is omitted, prompts interactively.
+ *
+ * Options:
+ *   --edge, -e    Include Cloudflare Workers deployment files
  */
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -50,8 +54,11 @@ function checkBunVersion(): boolean {
 	return parts[0]! >= 1 && (parts[0]! > 1 || parts[1]! >= 3)
 }
 
-async function handleArgs(): Promise<string | null> {
+async function handleArgs(): Promise<{ projectName: string | null; useEdge: boolean }> {
 	const args = process.argv.slice(2)
+	let useEdge = false
+	const positional: string[] = []
+
 	for (const arg of args) {
 		if (arg === "--help" || arg === "-h") {
 			console.log()
@@ -59,12 +66,14 @@ async function handleArgs(): Promise<string | null> {
 			console.log()
 			console.log(`  ${D("Usage:")}`)
 			console.log(`    bun create bunigniter ${C("<project-name>")}`)
+			console.log(`    bun create bunigniter ${C("<project-name>")} ${D("--edge")}`)
 			console.log(`    bun x create-bunigniter ${C("<project-name>")}`)
 			console.log(`    npx create-bunigniter ${C("<project-name>")}`)
 			console.log()
 			console.log(`  ${D("Options:")}`)
-			console.log(`    --help, -h    Show this help message`)
-			console.log(`    --version, -V Show version`)
+			console.log(`    --help, -h        Show this help message`)
+			console.log(`    --version, -V     Show version`)
+			console.log(`    --edge, -e        Include Cloudflare Workers deployment files`)
 			console.log()
 			exit(0)
 		}
@@ -78,12 +87,16 @@ async function handleArgs(): Promise<string | null> {
 			}
 			exit(0)
 		}
+		if (arg === "--edge" || arg === "-e") {
+			useEdge = true
+			continue
+		}
+		if (!arg.startsWith("-")) {
+			positional.push(arg)
+		}
 	}
-	// First non-flag arg is project name
-	for (const arg of args) {
-		if (!arg.startsWith("-")) return arg
-	}
-	return null
+
+	return { projectName: positional[0] ?? null, useEdge }
 }
 
 // ─── Template generators ────────────────────────────────────
@@ -101,14 +114,22 @@ function pkgJson(name: string) {
 				seed: "bun run db/seed.ts",
 				bi: "bun run node_modules/bunigniter/dist/cli/index.ts",
 				"bi:repl": "bun run node_modules/bunigniter/dist/cli/index.ts repl",
+				"cf:dev": "wrangler dev",
+				"cf:deploy": "wrangler deploy",
+				"cf:db:create": "wrangler d1 create ${npm_package_name}-db",
+				"cf:db:init": "wrangler d1 execute ${npm_package_name}-db --file=./db/init.sql",
 			},
 			dependencies: {
 				bunigniter: "^0.4",
 				"drizzle-orm": "^0.45",
+				elysia: "^2.0.0-exp.9",
 				"react": "^19",
 				"react-dom": "^19",
 				"typebox": "1.2.16",
 				zod: "^4",
+			},
+			devDependencies: {
+				wrangler: "^4",
 			},
 		},
 		null,
@@ -143,6 +164,7 @@ function tsCfg() {
 				"views/**/*.tsx",
 				"middleware/**/*.ts",
 				"modules/**/*.ts",
+				"src/**/*.ts",
 				"dev.ts",
 			],
 		},
@@ -164,6 +186,10 @@ function gitignore() {
 		"*.db-journal",
 		".test_uploads",
 		".playwright-mcp/",
+		"",
+		"# Cloudflare / Wrangler",
+		".wrangler/",
+		"worker/",
 	].join("\n") + "\n"
 }
 
@@ -178,6 +204,7 @@ function envExample() {
 		"APP_KEY=",
 		"DEBUG=false",
 		"CORS_ORIGIN=*",
+		"EDGE=false",
 	].join("\n") + "\n"
 }
 
@@ -218,7 +245,15 @@ function configApp() {
 		`\t\t\t| "d1",`,
 		`\t\tconnection: {`,
 		`\t\t\tfilename: env("DB_FILENAME", "data/app.db"),`,
+		`\t\t\t// D1 binding — used when dialect is "d1" (Cloudflare Workers)`,
+		`\t\t\t// binding: process.env.DB,`,
 		`\t\t},`,
+		`\t},`,
+		``,
+		`\t// Edge/Cloudflare config — used by src/worker.ts`,
+		`\tedge: {`,
+		`\t\tenabled: env("EDGE", "false") as unknown as boolean,`,
+		`\t\td1Binding: "DB",`,
 		`\t},`,
 		``,
 		`\trouter: {`,
@@ -689,229 +724,558 @@ function welcomeView() {
 		`    <p><code>bun run bi repl</code> — Interactive REPL</p>`,
 		`  </div>`,
 		`</div>`,
-		``,
-	].join("\n")
+  ].join("\n")
 }
 
 function itemsView() {
-	return [
-		`<div>`,
-		`  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">`,
-		`    <h1>📋 Items (<?= total ?? 0 ?>)</h1>`,
-		`    <a href="/items/new" class="btn btn-primary">+ New Item</a>`,
-		`  </div>`,
-		``,
-		`  <? if (items && items.length > 0) { ?>`,
-		`    <? for (const item of items) { ?>`,
-		`      <div class="card">`,
-		`        <div style="display: flex; justify-content: space-between; align-items: flex-start;">`,
-		`          <div>`,
-		`            <h3 style="color: #fff; margin-bottom: 4px;"><?= item.title ?></h3>`,
-		`            <? if (item.content) { ?>`,
-		`              <p style="color: #888; font-size: 13px;"><?= item.content ?></p>`,
-		`            <? } ?>`,
-		`            <p style="color: #555; font-size: 11px; margin-top: 4px;">`,
-		`              Created: <?= item.created_at ?>`,
-		`            </p>`,
-		`          </div>`,
-		`          <form action="/items/<?= item.id ?>" method="POST" style="display: inline;">`,
-		`            <input type="hidden" name="_method" value="DELETE" />`,
-		`            <button type="submit" style="background: none; border: none; color: #666; cursor: pointer; font-size: 18px;">✕</button>`,
-		`          </form>`,
-		`        </div>`,
-		`      </div>`,
-		`    <? } ?>`,
-		`  <? } else { ?>`,
-		`    <div style="text-align: center; padding: 60px 0; color: #666;">`,
-		`      <p style="font-size: 48px; margin-bottom: 16px;">📭</p>`,
-		`      <p>No items yet. Create your first one!</p>`,
-		`      <p style="margin-top: 16px;">`,
-		`        <a href="/items/new" class="btn btn-primary">+ Create Item</a>`,
-		`      </p>`,
-		`      <p style="margin-top: 24px; font-size: 12px;">`,
-		`        Or run <code>bun run seed</code> to seed sample data.`,
-		`      </p>`,
-		`    </div>`,
-		`  <? } ?>`,
-		`</div>`,
-		``,
-	].join("\n")
+  return [
+    `<div>`,
+    `  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">`,
+    `    <h1>📋 Items (<?= total ?? 0 ?>)</h1>`,
+    `    <a href="/items/new" class="btn btn-primary">+ New Item</a>`,
+    `  </div>`,
+    ``,
+    `  <? if (items && items.length > 0) { ?>`,
+    `    <? for (const item of items) { ?>`,
+    `      <div class="card">`,
+    `        <div style="display: flex; justify-content: space-between; align-items: flex-start;">`,
+    `          <div>`,
+    `            <h3 style="color: #fff; margin-bottom: 4px;"><?= item.title ?></h3>`,
+    `            <? if (item.content) { ?>`,
+    `              <p style="color: #888; font-size: 13px;"><?= item.content ?></p>`,
+    `            <? } ?>`,
+    `            <p style="color: #555; font-size: 11px; margin-top: 4px;">`,
+    `              Created: <?= item.created_at ?>`,
+    `            </p>`,
+    `          </div>`,
+    `          <form action="/items/<?= item.id ?>" method="POST" style="display: inline;">`,
+    `            <input type="hidden" name="_method" value="DELETE" />`,
+    `            <button type="submit" style="background: none; border: none; color: #666; cursor: pointer; font-size: 18px;">✕</button>`,
+    `          </form>`,
+    `        </div>`,
+    `      </div>`,
+    `    <? } ?>`,
+    `  <? } else { ?>`,
+    `    <div style="text-align: center; padding: 60px 0; color: #666;">`,
+    `      <p style="font-size: 48px; margin-bottom: 16px;">📭</p>`,
+    `      <p>No items yet. Create your first one!</p>`,
+    `      <p style="margin-top: 16px;">`,
+    `        <a href="/items/new" class="btn btn-primary">+ Create Item</a>`,
+    `      </p>`,
+    `      <p style="margin-top: 24px; font-size: 12px;">`,
+    `        Or run <code>bun run seed</code> to seed sample data.`,
+    `      </p>`,
+    `    </div>`,
+    `  <? } ?>`,
+    `</div>`,
+    ``,
+  ].join("\n")
 }
 
 function newItemView() {
-	return [
-		`<div>`,
-		`  <h1>✏️ New Item</h1>`,
-		`  <p style="color: #888; margin-bottom: 24px;">Fill in the form below to create a new item.</p>`,
-		``,
-		`  <form action="/items" method="POST" style="max-width: 500px;">`,
-		`    <div>`,
-		`      <label for="title">Title *</label>`,
-		`      <input type="text" name="title" id="title" placeholder="What's this item about?" required />`,
-		`    </div>`,
-		`    <div>`,
-		`      <label for="content">Content</label>`,
-		`      <textarea name="content" id="content" placeholder="Optional description..."></textarea>`,
-		`    </div>`,
-		`    <div style="display: flex; gap: 12px;">`,
-		`      <button type="submit" class="btn btn-primary">Save</button>`,
-		`      <a href="/items" class="btn btn-secondary">Cancel</a>`,
-		`    </div>`,
-		`  </form>`,
-		`</div>`,
-		``,
-	].join("\n")
+  return [
+    `<div>`,
+    `  <h1>✏️ New Item</h1>`,
+    `  <p style="color: #888; margin-bottom: 24px;">Fill in the form below to create a new item.</p>`,
+    ``,
+    `  <form action="/items" method="POST" style="max-width: 500px;">`,
+    `    <div>`,
+    `      <label for="title">Title *</label>`,
+    `      <input type="text" name="title" id="title" placeholder="What's this item about?" required />`,
+    `    </div>`,
+    `    <div>`,
+    `      <label for="content">Content</label>`,
+    `      <textarea name="content" id="content" placeholder="Optional description..."></textarea>`,
+    `    </div>`,
+    `    <div style="display: flex; gap: 12px;">`,
+    `      <button type="submit" class="btn btn-primary">Save</button>`,
+    `      <a href="/items" class="btn btn-secondary">Cancel</a>`,
+    `    </div>`,
+    `  </form>`,
+    `</div>`,
+    ``,
+  ].join("\n")
+}
+
+// ─── Cloudflare Workers template generators ─────────────────
+
+function wranglerToml(projectName: string) {
+  return [
+    `# Cloudflare Workers configuration`,
+    `# https://developers.cloudflare.com/workers/wrangler/configuration/`,
+    ``,
+    `name = "${projectName}"`,
+    `main = "src/worker.ts"`,
+    `compatibility_date = "2026-06-01"`,
+    `compatibility_flags = ["nodejs_compat"]`,
+    ``,
+    `# D1 Database binding`,
+    `[[d1_databases]]`,
+    `binding = "DB"`,
+    `database_name = "${projectName}-db"`,
+    `database_id = ""`,
+    `preview_database_id = ""`,
+    ``,
+    `# Environment variables`,
+    `[vars]`,
+    `DEBUG = "false"`,
+    `CORS_ORIGIN = "*"`,
+    `ROUTER_PREFIX = ""`,
+    ``,
+    `# Logging`,
+    `[observability]`,
+    `enabled = true`,
+  ].join("\n") + "\n"
+}
+
+function workerEntry() {
+  return [
+    `/**`,
+    ` * Cloudflare Worker entry point — Edge deployment.`,
+    ` *`,
+    ` * Uses Elysia directly (edge-compatible, no node:fs dependency).`,
+    ` * Database uses D1 binding via Cloudflare's D1.`,
+    ` * Views are rendered inline (pre-compiled, no filesystem).`,
+    ` *`,
+    ` * Setup:`,
+    ` *   1. wrangler d1 create <project-name>-db`,
+    ` *   2. Update wrangler.toml with the database_id`,
+    ` *   3. wrangler deploy`,
+    ` *`,
+    ` * Dev:`,
+    ` *   wrangler dev`,
+    ` */`,
+    `import { Elysia } from "elysia"`,
+    ``,
+    `// ─── Cloudflare Workers types (inline) ───────────────────`,
+    ``,
+    `declare class D1Database {`,
+    `  prepare(sql: string): D1PreparedStatement`,
+    `}`,
+    `declare class D1PreparedStatement {`,
+    `  bind(...params: unknown[]): D1PreparedStatement`,
+    `  run(): Promise<D1Result>`,
+    `}`,
+    `interface D1Result {`,
+    `  results?: any[]`,
+    `  meta?: { changes?: number; last_row_id?: number }`,
+    `}`,
+    ``,
+    `interface Env {`,
+    `  DB: D1Database`,
+    `  CORS_ORIGIN?: string`,
+    `}`,
+    ``,
+    `// ─── Database helpers ───────────────────────────────────`,
+    ``,
+    `async function query<T = any>(db: D1Database, sql: string, params: unknown[] = []): Promise<{ rows: T[]; affectedRows: number }> {`,
+    `  const stmt = db.prepare(sql)`,
+    `  if (params.length > 0) stmt.bind(...params)`,
+    `  const result = await stmt.run()`,
+    `  return { rows: (result as any)?.results ?? [], affectedRows: result.meta?.changes ?? 0 }`,
+    `}`,
+    ``,
+    `async function first<T = any>(db: D1Database, sql: string, params: unknown[] = []): Promise<T | null> {`,
+    `  const r = await query<T>(db, sql, params)`,
+    `  return r.rows[0] ?? null`,
+    `}`,
+    ``,
+    `// ─── Response helpers ───────────────────────────────────`,
+    ``,
+    `function json(data: unknown, status = 200): Response {`,
+    `  return new Response(JSON.stringify(data), {`,
+    `    status,`,
+    `    headers: { "content-type": "application/json" },`,
+    `  })`,
+    `}`,
+    ``,
+    `function redirect(url: string, status: 301 | 302 = 302): Response {`,
+    `  return new Response(null, { status, headers: { location: url } })`,
+    `}`,
+    ``,
+    `function escapeHtml(s: unknown): string {`,
+    `  return String(s ?? "")`,
+    `    .replace(/&/g, "&amp;")`,
+    `    .replace(/</g, "&lt;")`,
+    `    .replace(/>/g, "&gt;")`,
+    `    .replace(/"/g, "&quot;")`,
+    `    .replace(/'/g, "&#39;")`,
+    `}`,
+    ``,
+    `// ─── App entry ─────────────────────────────────────────`,
+    ``,
+    `export default {`,
+    `  async fetch(request: Request, env: Env): Promise<Response> {`,
+    `    // CORS preflight`,
+    `    if (request.method === "OPTIONS") {`,
+    `      return new Response(null, {`,
+    `        headers: {`,
+    `          "Access-Control-Allow-Origin": env.CORS_ORIGIN ?? "*",`,
+    `          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",`,
+    `          "Access-Control-Allow-Headers": "Content-Type, Authorization",`,
+    `        },`,
+    `      })`,
+    `    }`,
+    ``,
+    `    const app = new Elysia()`,
+    ``,
+    `    // GET / — Welcome`,
+    `    app.get("/", async () => {`,
+    `      let items = [`,
+    `        { id: 1, title: "Welcome to Bunigniter", content: "Edit the worker", created_at: "2026-01-01" },`,
+    `        { id: 2, title: "Edge-ready", content: "Running on Cloudflare Workers", created_at: "2026-01-02" },`,
+    `        { id: 3, title: "D1 Database", content: "SQLite-compatible serverless DB", created_at: "2026-01-03" },`,
+    `      ]`,
+    `      try {`,
+    `        const r = await query<{ c: number }>(env.DB, "SELECT count(*) as c FROM items")`,
+    `        if (Number(r.rows[0]?.c) > 0) {`,
+    `          const result = await query(env.DB, "SELECT * FROM items LIMIT 100")`,
+    `          items = result.rows`,
+    `        }`,
+    `      } catch { /* DB not seeded yet — use demo */ }`,
+    `      return renderPage("welcome", { title: "Welcome", items })`,
+    `    })`,
+    ``,
+    `    // GET /items — List`,
+    `    app.get("/items", async () => {`,
+    `      let items: any[] = [`,
+    `        { id: 1, title: "Sample Item", content: "Demo data", created_at: "2026-01-01" },`,
+    `      ]`,
+    `      try {`,
+    `        const r = await query(env.DB, "SELECT * FROM items ORDER BY created_at DESC")`,
+    `        if (r.rows.length > 0) items = r.rows`,
+    `      } catch { /* DB not seeded */ }`,
+    `      return renderPage("items", { title: "Items", items, total: items.length })`,
+    `    })`,
+    ``,
+    `    // GET /items/new — Create form`,
+    `    app.get("/items/new", () => renderPage("new-item", { title: "New Item" }))`,
+    ``,
+    `    // POST /items — Create`,
+    `    app.post("/items", async (ctx) => {`,
+    `      const body = ctx.body as Record<string, any>`,
+    `      const title = body?.title?.trim()`,
+    `      if (!title) return json({ error: "Title is required" }, 400)`,
+    `      await query(env.DB, "INSERT INTO items (title, content) VALUES (?, ?)", [title, body?.content ?? ""])`,
+    `      return redirect("/items")`,
+    `    })`,
+    ``,
+    `    // PUT /items/:id — Update`,
+    `    app.put("/items/:id", async (ctx) => {`,
+    `      const id = Number(ctx.params?.id)`,
+    `      if (!id) return json({ error: "Invalid ID" }, 400)`,
+    `      const existing = await first<{ id: number }>(env.DB, "SELECT id FROM items WHERE id = ?", [id])`,
+    `      if (!existing) return new Response("Not Found", { status: 404 })`,
+    `      const body = ctx.body as Record<string, any>`,
+    `      const updates: string[] = []; const params: unknown[] = []`,
+    `      if (body.title !== undefined) { updates.push("title = ?"); params.push(body.title.trim()) }`,
+    `      if (body.content !== undefined) { updates.push("content = ?"); params.push(body.content) }`,
+    `      if (updates.length === 0) return redirect("/items")`,
+    `      updates.push("updated_at = datetime('now')"); params.push(id)`,
+    `      await query(env.DB, \`UPDATE items SET \${updates.join(", ")} WHERE id = ?\`, params)`,
+    `      return redirect("/items")`,
+    `    })`,
+    ``,
+    `    // DELETE /items/:id — Delete`,
+    `    app.delete("/items/:id", async (ctx) => {`,
+    `      const id = Number(ctx.params?.id)`,
+    `      if (!id) return json({ error: "Invalid ID" }, 400)`,
+    `      await query(env.DB, "DELETE FROM items WHERE id = ?", [id])`,
+    `      return redirect("/items")`,
+    `    })`,
+    ``,
+    `    // POST /items/:id — _method override`,
+    `    app.post("/items/:id", async (ctx) => {`,
+    `      const m = (ctx.body as any)?._method?.toUpperCase()`,
+    `      if (m === "PUT") return await app.fetch(new Request(ctx.request, { method: "PUT", body: ctx.request.body }))`,
+    `      if (m === "DELETE") return await app.fetch(new Request(ctx.request, { method: "DELETE" }))`,
+    `      return new Response("Method Not Allowed", { status: 405 })`,
+    `    })`,
+    ``,
+    `    // GET /api — Greeting`,
+    `    app.get("/api", () => json({ message: "Hello from Bunigniter on Cloudflare!", timestamp: new Date().toISOString() }))`,
+    ``,
+    `    // POST /api — Echo`,
+    `    app.post("/api", async (ctx) => {`,
+    `      const body = ctx.body as Record<string, any>`,
+    `      if (!body?.name || typeof body.name !== "string" || body.name.length < 1 || body.name.length > 100) {`,
+    `        return json({ error: "name is required (1-100 chars)" }, 400)`,
+    `      }`,
+    `      return json({ received: { ...body, upperName: body.name.toUpperCase() } })`,
+    `    })`,
+    ``,
+    `    // GET /health`,
+    `    app.get("/health", () => json({ status: "ok", runtime: "cloudflare", timestamp: new Date().toISOString() }))`,
+    ``,
+    `    return app.fetch(request)`,
+    `  },`,
+    `}`,
+    ``,
+    `// ─── Inline HTML rendering ──────────────────────────────`,
+    ``,
+    `const LAYOUT = \`<!DOCTYPE html>`,
+    `<html lang="en">`,
+    `<head>`,
+    `  <meta charset="UTF-8">`,
+    `  <meta name="viewport" content="width=device-width, initial-scale=1.0">`,
+    `  <title>{{TITLE}}</title>`,
+    `  <style>`,
+    `    * { margin: 0; padding: 0; box-sizing: border-box; }`,
+    `    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f0f23; color: #e0e0e0; min-height: 100vh; }`,
+    `    .container { max-width: 780px; margin: 0 auto; padding: 40px 20px; }`,
+    `    .nav { display: flex; gap: 16px; margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid #333; align-items: center; }`,
+    `    .nav a { color: #70a1ff; text-decoration: none; font-size: 14px; }`,
+    `    .nav a:hover { color: #e94560; }`,
+    `    .nav .brand { color: #e94560; font-weight: bold; font-size: 18px; margin-right: auto; }`,
+    `    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #333; text-align: center; color: #666; font-size: 12px; }`,
+    `    h1 { color: #e94560; margin-bottom: 16px; }`,
+    `    .card { background: #1a1a3e; border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; }`,
+    `    .card:hover { background: #2a2a5e; }`,
+    `    .btn { display: inline-block; padding: 8px 18px; border-radius: 6px; text-decoration: none; font-size: 14px; border: none; cursor: pointer; }`,
+    `    .btn-primary { background: #e94560; color: #fff; }`,
+    `    .btn-secondary { background: #1a1a3e; color: #70a1ff; border: 1px solid #333; }`,
+    `    input[type="text"], textarea { width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid #333; background: #1a1a3e; color: #fff; font-size: 14px; margin-bottom: 12px; }`,
+    `    textarea { min-height: 100px; resize: vertical; }`,
+    `    label { display: block; color: #aaa; font-size: 13px; margin-bottom: 4px; }`,
+    `  </style>`,
+    `</head>`,
+    `<body>`,
+    `  <div class="container">`,
+    `    <nav class="nav">`,
+    `      <span class="brand">🚀 Bunigniter</span>`,
+    `      <a href="/">Home</a>`,
+    `      <a href="/items">Items</a>`,
+    `      <a href="/api">API</a>`,
+    `    </nav>`,
+    `    <main>`,
+    `{{SLOT}}`,
+    `    </main>`,
+    `    <div class="footer">`,
+    `      <p>Powered by Bunigniter + Cloudflare Workers | MIT License</p>`,
+    `    </div>`,
+    `  </div>`,
+    `</body>`,
+    `</html>\``,
+    ``,
+    `function wrap(title: string, content: string): string {`,
+    `  return LAYOUT.replace("{{TITLE}}", escapeHtml(title)).replace("{{SLOT}}", content)`,
+    `}`,
+    ``,
+    `function renderPage(view: string, props: Record<string, any>): Response {`,
+    `  const t = (props.title as string) ?? "Bunigniter"`,
+    `  const items = props.items as any[] | undefined`,
+    `  let content = ""`,
+    `  if (view === "welcome") {`,
+    `    content = items !== undefined`,
+    `      ? \`<div style="text-align:center;padding:40px 0"><h1 style="font-size:48px;margin-bottom:16px;">🚀 Bunigniter</h1><p style="font-size:18px;color:#888;margin-bottom:24px;">Deployed on Cloudflare Workers!</p><div style="display:inline-block;background:#1a1a3e;border-radius:8px;padding:20px 40px;margin-bottom:24px"><p style="font-size:36px;font-weight:bold;color:#70a1ff">\${items.length}</p><p style="color:#888;">items</p></div><div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap"><a href="/items" class="btn btn-primary">📋 View Items</a><a href="/api" class="btn btn-secondary">🔌 API Demo</a></div></div>\``,
+    `      : \`<div style="text-align:center;padding:40px 0"><h1 style="font-size:48px;margin-bottom:16px;">🚀 Bunigniter</h1><p style="font-size:18px;color:#888;margin-bottom:24px;">Deployed on Cloudflare Workers!</p><a href="/items" class="btn btn-primary">📋 View Items</a></div>\``,
+    `  } else if (view === "items") {`,
+    `    const cards = (items?.length ?? 0) > 0`,
+    `      ? items!.map((i: any) => \`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h3 style="color:#fff;margin-bottom:4px">\${escapeHtml(i.title)}</h3>\${i.content ? \`<p style="color:#888;font-size:13px">\${escapeHtml(i.content)}</p>\` : ""}<p style="color:#555;font-size:11px;margin-top:4px">Created: \${escapeHtml(i.created_at)}</p></div><form action="/items/\${i.id}" method="POST" style="display:inline"><input type="hidden" name="_method" value="DELETE"/><button type="submit" style="background:none;border:none;color:#666;cursor:pointer;font-size:18px">✕</button></form></div></div>\`).join("\\n")`,
+    `      : \`<div style="text-align:center;padding:60px 0;color:#666"><p style="font-size:48px;margin-bottom:16px">📭</p><p>No items yet.</p></div>\``,
+    `    content = \`<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px"><h1>📋 Items (\${props.total ?? items?.length ?? 0})</h1><a href="/items/new" class="btn btn-primary">+ New Item</a></div>\${cards}</div>\``,
+    `  } else if (view === "new-item") {`,
+    `    content = \`<div><h1>✏️ New Item</h1><p style="color:#888;margin-bottom:24px">Fill in the form below.</p><form action="/items" method="POST" style="max-width:500px"><div><label for="title">Title *</label><input type="text" name="title" id="title" placeholder="What's this about?" required/></div><div><label for="content">Content</label><textarea name="content" id="content" placeholder="Optional description..."></textarea></div><div style="display:flex;gap:12px"><button type="submit" class="btn btn-primary">Save</button><a href="/items" class="btn btn-secondary">Cancel</a></div></form></div>\``,
+    `  }`,
+    `  return new Response(wrap(t, content), { headers: { "content-type": "text/html; charset=utf-8" } })`,
+    `}`,
+    ``,
+  ].join("\n")
+}
+
+function initSql() {
+  return [
+    `-- D1 Database initialization script`,
+    `-- Run: wrangler d1 execute <project-name>-db --file=./db/init.sql`,
+    ``,
+    `CREATE TABLE IF NOT EXISTS items (`,
+    `    id INTEGER PRIMARY KEY AUTOINCREMENT,`,
+    `    title TEXT NOT NULL,`,
+    `    content TEXT DEFAULT '',`,
+    `    created_at TEXT NOT NULL DEFAULT (datetime('now')),`,
+    `    updated_at TEXT NOT NULL DEFAULT (datetime('now'))`,
+    `);`,
+    ``,
+    `INSERT INTO items (title, content) VALUES ('Welcome to Bunigniter', 'Deployed on Cloudflare Workers!');`,
+    `INSERT INTO items (title, content) VALUES ('Edge-ready', 'Running on Cloudflare Workers via D1');`,
+    `INSERT INTO items (title, content) VALUES ('D1 Database', 'SQLite-compatible serverless database');`,
+  ].join("\n") + "\n"
 }
 
 // ─── Scaffold ───────────────────────────────────────────────
 
-function scaffold(dir: string, projectName: string) {
-	const subdirs = ["config", "routes", "routes/items", "views", "db", "data"]
-	for (const sub of subdirs) {
-		mkdirSync(join(dir, sub), { recursive: true })
-	}
+function scaffold(dir: string, projectName: string, useEdge: boolean) {
+  const subdirs = ["config", "routes", "routes/items", "views", "db", "data"]
+  if (useEdge) subdirs.push("src")
+  for (const sub of subdirs) {
+    mkdirSync(join(dir, sub), { recursive: true })
+  }
 
-	// Root files
-	writeFileSync(join(dir, "package.json"), pkgJson(projectName))
-	writeFileSync(join(dir, "tsconfig.json"), tsCfg())
-	writeFileSync(join(dir, ".gitignore"), gitignore())
-	writeFileSync(join(dir, ".env.example"), envExample())
-	writeFileSync(join(dir, "dev.ts"), devEntry(projectName))
+  // Root files
+  writeFileSync(join(dir, "package.json"), pkgJson(projectName))
+  writeFileSync(join(dir, "tsconfig.json"), tsCfg())
+  writeFileSync(join(dir, ".gitignore"), gitignore())
+  writeFileSync(join(dir, ".env.example"), envExample())
+  writeFileSync(join(dir, "dev.ts"), devEntry(projectName))
 
-	// Config
-	writeFileSync(join(dir, "config", "app.ts"), configApp())
+  // Config
+  writeFileSync(join(dir, "config", "app.ts"), configApp())
 
-	// Database
-	writeFileSync(join(dir, "db", "seed.ts"), seedScript())
+  // Database
+  writeFileSync(join(dir, "db", "seed.ts"), seedScript())
 
-	// Routes
-	writeFileSync(join(dir, "routes", "index.ts"), routeIndex())
-	writeFileSync(join(dir, "routes", "welcome.ts"), routeWelcome())
-	writeFileSync(join(dir, "routes", "items.ts"), routeItems())
-	writeFileSync(join(dir, "routes", "items", "new.ts"), routeNewItem())
-	writeFileSync(join(dir, "routes", "api.ts"), routeApi())
-	writeFileSync(join(dir, "routes", "schedule.ts"), routeSchedule())
+  // Routes
+  writeFileSync(join(dir, "routes", "index.ts"), routeIndex())
+  writeFileSync(join(dir, "routes", "welcome.ts"), routeWelcome())
+  writeFileSync(join(dir, "routes", "items.ts"), routeItems())
+  writeFileSync(join(dir, "routes", "items", "new.ts"), routeNewItem())
+  writeFileSync(join(dir, "routes", "api.ts"), routeApi())
+  writeFileSync(join(dir, "routes", "schedule.ts"), routeSchedule())
 
-	// Views
-	writeFileSync(join(dir, "views", "_layout.html"), layoutHtml())
-	writeFileSync(join(dir, "views", "welcome.html"), welcomeView())
-	writeFileSync(join(dir, "views", "items.html"), itemsView())
-	writeFileSync(join(dir, "views", "new-item.html"), newItemView())
+  // Views
+  writeFileSync(join(dir, "views", "_layout.html"), layoutHtml())
+  writeFileSync(join(dir, "views", "welcome.html"), welcomeView())
+  writeFileSync(join(dir, "views", "items.html"), itemsView())
+  writeFileSync(join(dir, "views", "new-item.html"), newItemView())
+
+  // Cloudflare Workers files (optional)
+  if (useEdge) {
+    writeFileSync(join(dir, "wrangler.toml"), wranglerToml(projectName))
+    writeFileSync(join(dir, "src", "worker.ts"), workerEntry())
+    writeFileSync(join(dir, "db", "init.sql"), initSql())
+  }
 }
 
 // ─── Main ───────────────────────────────────────────────────
 
 async function main() {
-	// Handle flags first (before any output)
-	let projectName = await handleArgs()
-	if (projectName === null) {
-		// help or version was shown, exit was called in handleArgs
-		return
-	}
+  // Handle flags
+  const { projectName: name, useEdge } = await handleArgs()
+  let projectName = name
+  if (projectName === null) return // help or version was shown
 
-	console.log()
-	console.log(`  ${G("◇")}  ${C("create-bunigniter")} — Scaffold a Bunigniter project`)
-	console.log()
+  console.log()
+  const edgeTag = useEdge ? ` ${D("(with Cloudflare Workers)")}` : ""
+  console.log(`  ${G("◇")}  ${C("create-bunigniter")} — Scaffold a Bunigniter project${edgeTag}`)
+  console.log()
 
-	// Check Bun version
-	if (!checkBunVersion()) {
-		console.log(`  ${R("✗")}  Bun >=1.3.0 is required (current: ${process.versions.bun ?? "unknown"})`)
-		console.log(`     Install: ${C("curl -fsSL https://bun.sh/install | bash")}`)
-		exit(1)
-	}
-	console.log(`  ${G("✓")}  Bun ${process.versions.bun}`)
+  // Check Bun version
+  if (!checkBunVersion()) {
+    console.log(`  ${R("✗")}  Bun >=1.3.0 is required (current: ${process.versions.bun ?? "unknown"})`)
+    console.log(`     Install: ${C("curl -fsSL https://bun.sh/install | bash")}`)
+    exit(1)
+  }
+  console.log(`  ${G("✓")}  Bun ${process.versions.bun}`)
+  if (useEdge) console.log(`  ${G("✓")}  Cloudflare Workers files`)
 
-	// Get project name (CLI arg or prompt)
-	if (!projectName) {
-		projectName = await prompt(`  ${Y("?")}  Project name: `)
-	}
+  // Get project name (CLI arg or prompt)
+  if (!projectName) {
+    projectName = await prompt(`  ${Y("?")}  Project name: `)
+  }
 
-	projectName = sanitize(projectName ?? "")
-	if (!projectName) {
-		console.log(`  ${R("✗")}  Project name is required`)
-		exit(1)
-	}
+  projectName = sanitize(projectName ?? "")
+  if (!projectName) {
+    console.log(`  ${R("✗")}  Project name is required`)
+    exit(1)
+  }
 
-	// Destination
-	const dest = join(cwd(), projectName)
-	if (existsSync(dest)) {
-		console.log(`  ${R("✗")}  Directory "${projectName}" already exists`)
-		exit(1)
-	}
+  // Destination
+  const dest = join(cwd(), projectName)
+  if (existsSync(dest)) {
+    console.log(`  ${R("✗")}  Directory "${projectName}" already exists`)
+    exit(1)
+  }
 
-	// Scaffold
-	console.log()
-	console.log(`  ${D("Scaffolding in")} ${dest}`)
-	scaffold(dest, projectName)
-	console.log(`  ${G("✓")}  Project "${projectName}" created`)
+  // Scaffold
+  console.log()
+  console.log(`  ${D("Scaffolding in")} ${dest}`)
+  scaffold(dest, projectName, useEdge)
+  console.log(`  ${G("✓")}  Project "${projectName}" created`)
 
-	// Summary
-	console.log()
-	console.log(`  ${D("Files:")}`)
-	console.log(`    config/app.ts        — Application configuration`)
-	console.log(`    routes/index.ts      — Home (redirects to /items)`)
-	console.log(`    routes/items.ts      — Items CRUD controller`)
-	console.log(`    routes/welcome.ts    — Welcome page`)
-	console.log(`    routes/api.ts        — API handler (void-style)`)
-	console.log(`    routes/items/new.ts  — New item form`)
-	console.log(`    routes/schedule.ts   — Scheduled tasks demo`)
-	console.log(`    views/_layout.html   — Auto-layout wrapper`)
-	console.log(`    views/welcome.html   — Welcome page template`)
-	console.log(`    views/items.html     — Items list template`)
-	console.log(`    views/new-item.html  — New item form template`)
-	console.log(`    db/seed.ts           — Database seeder`)
-	console.log(`    dev.ts               — Entry point`)
-	console.log(`    package.json         — Dependencies & scripts`)
-	console.log(`    tsconfig.json        — TypeScript config`)
-	console.log(`    .gitignore           — Git ignore rules`)
-	console.log(`    .env.example         — Environment variables`)
-	console.log()
+  // Summary
+  console.log()
+  console.log(`  ${D("Files:")}`)
+  console.log(`    config/app.ts        — Application configuration`)
+  console.log(`    routes/index.ts      — Home (redirects to /items)`)
+  console.log(`    routes/items.ts      — Items CRUD controller`)
+  console.log(`    routes/welcome.ts    — Welcome page`)
+  console.log(`    routes/api.ts        — API handler (void-style)`)
+  console.log(`    routes/items/new.ts  — New item form`)
+  console.log(`    routes/schedule.ts   — Scheduled tasks demo`)
+  console.log(`    views/_layout.html   — Auto-layout wrapper`)
+  console.log(`    views/welcome.html   — Welcome page template`)
+  console.log(`    views/items.html     — Items list template`)
+  console.log(`    views/new-item.html  — New item form template`)
+  console.log(`    db/seed.ts           — Database seeder`)
+  console.log(`    dev.ts               — Entry point`)
+  console.log(`    package.json         — Dependencies & scripts`)
+  console.log(`    tsconfig.json        — TypeScript config`)
+  console.log(`    .gitignore           — Git ignore rules`)
+  console.log(`    .env.example         — Environment variables`)
+  if (useEdge) {
+    console.log(`  ${C("── Cloudflare Workers ──")}`)
+    console.log(`    wrangler.toml        — Workers configuration`)
+    console.log(`    src/worker.ts        — Worker entry point`)
+    console.log(`    db/init.sql          — D1 initialization script`)
+  }
+  console.log()
 
-	// Install dependencies prompt
-	const installChoice = await prompt(`  ${Y("?")}  Run ${C("bun install")} now? ${D("(Y/n)")} `)
-	let installFailed = false
+  // Install dependencies prompt
+  const installChoice = await prompt(`  ${Y("?")}  Run ${C("bun install")} now? ${D("(Y/n)")} `)
+  let installFailed = false
 
-	if (installChoice.toLowerCase() !== "n") {
-		console.log()
-		console.log(`  ${D("Installing dependencies...")}`)
-		chdir(dest)
+  if (installChoice.toLowerCase() !== "n") {
+    console.log()
+    console.log(`  ${D("Installing dependencies...")}`)
+    chdir(dest)
 
-		const proc = Bun.spawnSync(["bun", "install"], {
-			stdout: "inherit",
-			stderr: "inherit",
-		})
+    const proc = Bun.spawnSync(["bun", "install"], {
+      stdout: "inherit",
+      stderr: "inherit",
+    })
 
-		if (proc.exitCode === 0) {
-			console.log(`  ${G("✓")}  Dependencies installed`)
-		} else {
-			installFailed = true
-			console.log(`  ${Y("!")}  "bun install" exited with code ${proc.exitCode}`)
-		}
-	} else {
-		installFailed = true
-	}
+    if (proc.exitCode === 0) {
+      console.log(`  ${G("✓")}  Dependencies installed`)
+    } else {
+      installFailed = true
+      console.log(`  ${Y("!")}  "bun install" exited with code ${proc.exitCode}`)
+    }
+  } else {
+    installFailed = true
+  }
 
-	// Done
-	console.log()
-	console.log(`  ${G("■")}  ${projectName} is ready!`)
-	console.log()
-	console.log(`  ${D("Next steps:")}`)
-	console.log(`    cd ${projectName}`)
-	if (installFailed) {
-		console.log(`    bun install         ${D("# Install dependencies")}`)
-		console.log(`    bun run seed         ${D("# Create database & seed data")}`)
-		console.log(`    bun run dev          ${D("# After bun install, start dev server")}`)
-	} else {
-		console.log(`    bun run seed         ${D("# Create database & seed data")}`)
-		console.log(`    bun run dev          ${D("# Start dev server at :3000")}`)
-	}
-	console.log(`    DEBUG=true bun run dev ${D("# Enable debug toolbar with SQL profiler")}`)
-	console.log()
-	console.log(`  ${D("Open http://localhost:3000 in your browser.")}`)
-	console.log()
+  // Done
+  console.log()
+  console.log(`  ${G("■")}  ${projectName} is ready!`)
+  console.log()
+  console.log(`  ${D("Next steps:")}`)
+  console.log(`    cd ${projectName}`)
+  if (installFailed) {
+    console.log(`    bun install         ${D("# Install dependencies")}`)
+    console.log(`    bun run seed         ${D("# Create database & seed data")}`)
+    console.log(`    bun run dev          ${D("# After bun install, start dev server")}`)
+  } else {
+    console.log(`    bun run seed         ${D("# Create database & seed data")}`)
+    console.log(`    bun run dev          ${D("# Start dev server at :3000")}`)
+  }
+  console.log(`    DEBUG=true bun run dev ${D("# Enable debug toolbar")}`)
+
+  if (useEdge) {
+    console.log()
+    console.log(`  ${C("── Cloudflare Workers ──")}`)
+    console.log(`    wrangler d1 create ${projectName}-db  ${D("# Create D1 database")}`)
+    console.log(`    # Update wrangler.toml with the database_id`)
+    console.log(`    bun run cf:dev                      ${D("# Local Workers dev")}`)
+    console.log(`    bun run cf:db:init                  ${D("# Initialize D1 tables")}`)
+    console.log(`    bun run cf:deploy                   ${D("# Deploy to Cloudflare")}`)
+  }
+
+  console.log()
+  console.log(`  ${D("Open http://localhost:3000 in your browser.")}`)
+  console.log()
 }
 
 main().catch((err) => {
-	console.error(`  ${R("✗")}  ${err.message}`)
-	exit(1)
+  console.error(`  ${R("✗")}  ${err.message}`)
+  exit(1)
 })
