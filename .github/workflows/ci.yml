@@ -15,7 +15,6 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-      - run: bun run src/index.ts -- --version
 
   test-scaffold:
     runs-on: ubuntu-latest
@@ -24,20 +23,19 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - run: |
+      - name: Scaffold and verify
+        run: |
+          # create-bunigniter creates dir, installs bunigniter, then runs bi init --yes
           cd /tmp
           rm -rf test-scaffold-app
-          bun run "$GITHUB_WORKSPACE/src/index.ts" test-scaffold-app <<< "n"
+          bun run "$GITHUB_WORKSPACE/src/index.ts" test-scaffold-app
           cd test-scaffold-app
-          test -f package.json && echo "✓ package.json"
-          test -f config/app.ts && echo "✓ config/app.ts"
-          test -f routes/items.ts && echo "✓ routes/items.ts"
-          test -f routes/items/new.ts && echo "✓ routes/items/new.ts"
-          test -f routes/api.ts && echo "✓ routes/api.ts"
-          test -f views/_layout.html && echo "✓ views/_layout.html"
-          test -f views/welcome.html && echo "✓ views/welcome.html"
-          test -f db/seed.ts && echo "✓ db/seed.ts"
-          test -f dev.ts && echo "✓ dev.ts"
-          test -f .gitignore && echo "✓ .gitignore"
-          test -f .env.example && echo "✓ .env.example"
+          for f in \
+            package.json config/app.ts routes/index.ts \
+            routes/api.ts views/_layout.html views/welcome.html \
+            dev.ts tsconfig.json .gitignore .env.example; do
+            test -f "$f" && echo "✓ $f" || { echo "Missing: $f"; exit 1; }
+          done
           echo "✅ All scaffold files verified"
+          test -d node_modules && echo "✓ node_modules installed" \
+            || { echo "Missing: node_modules"; exit 1; }

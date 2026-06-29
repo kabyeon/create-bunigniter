@@ -92,6 +92,10 @@ async function handleArgs(): Promise<string | null> {
 			console.log(`    bun create bunigniter@latest ${C("<project-name>")}`)
 			console.log(`    bunx create-bunigniter@latest ${C("<project-name>")}`)
 			console.log()
+			console.log(`  ${D("Note:")}`)
+			console.log(`    Runtime selection (Bun / Cloudflare Workers) happens via the`)
+			console.log(`    interactive wizard provided by bunigniter's bi new command.`)
+			console.log()
 			console.log(`  ${D("Options:")}`)
 			console.log(`    --help, -h        Show this help`)
 			console.log(`    --version, -V     Show version`)
@@ -169,12 +173,12 @@ async function main() {
 		console.log(`  ${D("Run 'bun install' manually, then continue.")}`)
 	}
 
-	// Delegate to bi new
+	// Delegate to bi init --yes (defaults: bun runtime, sqlite, no openapi, simple template)
 	console.log()
-	console.log(`  ${G("◇")}  Launching interactive scaffold: ${C("bun run bi new")}`)
+	console.log(`  ${G("◇")}  Running scaffold: ${C("bun run bi init --yes")}`)
 	console.log()
 
-	const scaffoldProc = Bun.spawnSync(["bun", "run", "bi", "new"], {
+	const scaffoldProc = Bun.spawnSync(["bun", "run", "bi", "init", "--yes"], {
 		stdout: "inherit",
 		stderr: "inherit",
 		stdin: "inherit",
