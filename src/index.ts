@@ -71,7 +71,7 @@ function minPkgJson(name: string): string {
 				"bi:new": "bun run node_modules/bunigniter/dist/cli/index.ts new",
 			},
 			dependencies: {
-				bunigniter: "^0.4",
+				bunigniter: "^0.5",
 				elysia: "^2.0.0-exp.12",
 			},
 		},
