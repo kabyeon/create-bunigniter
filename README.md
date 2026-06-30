@@ -3,9 +3,9 @@
 # create-bunigniter
 
 [![npm](https://img.shields.io/npm/v/create-bunigniter)](https://www.npmjs.com/package/create-bunigniter)
-[![CI](https://github.com/nexus-ts/create-bunigniter/actions/workflows/ci.yml/badge.svg)](https://github.com/nexus-ts/create-bunigniter/actions)
+[![CI](https://github.com/kabyeon/create-bunigniter/actions/workflows/ci.yml/badge.svg)](https://github.com/kabyeon/create-bunigniter/actions)
 
-**Scaffold a [Bunigniter](https://github.com/nexus-ts/bunigniter) project in seconds.**
+**Scaffold a [Bunigniter](https://github.com/kabyeon/bunigniter) project in seconds.**
 
 Bunigniter is a Bun-native fullstack framework — CodeIgniter's DX × Elysia v2 performance × Edge-ready.
 
@@ -172,7 +172,7 @@ bun run cf:deploy                                           # Deploy to Cloudfla
 | Custom Domain | Add `routes = ["example.com/*"]` to `wrangler.toml` |
 | Logs | `npx wrangler tail` for real-time logs |
 
-Full documentation: [github.com/nexus-ts/bunigniter](https://github.com/nexus-ts/bunigniter)
+Full documentation: [github.com/kabyeon/bunigniter](https://github.com/kabyeon/bunigniter)
 
 ---
 

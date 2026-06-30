@@ -1,9 +1,9 @@
 # create-bunigniter — Development Guide
 
-Scaffold a new [Bunigniter](https://github.com/nexus-ts/bunigniter) project — Bun-native fullstack framework.
+Scaffold a new [Bunigniter](https://github.com/kabyeon/bunigniter) project — Bun-native fullstack framework.
 
 > **npm:** `create-bunigniter`
-> **GitHub:** github.com/nexus-ts/create-bunigniter
+> **GitHub:** github.com/kabyeon/create-bunigniter
 
 ---
 
@@ -124,5 +124,5 @@ With `Database: sqlite`: + db/seed.ts
 
 | Repo | Description |
 |------|-------------|
-| [bunigniter](https://github.com/nexus-ts/bunigniter) | The framework — all templates in `src/cli/scaffold.ts` |
-| [nexus-ts](https://github.com/nexus-ts) | Organization |
+| [bunigniter](https://github.com/kabyeon/bunigniter) | The framework — all templates in `src/cli/scaffold.ts` |
+| [kabyeon](https://github.com/kabyeon) | Organization |

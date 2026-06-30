@@ -31,4 +31,4 @@ All notable changes to create-bunigniter are documented in this file.
 - Interactive prompts for project name and configuration.
 - Automatic `bun install` after project creation.
 
-[0.3.7]: https://github.com/nexus-ts/create-bunigniter/compare/v0.3.6...v0.3.7
+[0.3.7]: https://github.com/kabyeon/create-bunigniter/compare/v0.3.6...v0.3.7
