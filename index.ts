@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 // ============================================================
 // create-bunigniter - bunx create-bunigniter@latest [이름]
 // BunIgniter 프로젝트 생성 스크립트

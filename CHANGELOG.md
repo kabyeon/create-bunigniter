@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2
+
+### Fix
+
+- **Add `#!/usr/bin/env bun` shebang** — Without the shebang line, `bunx` created a shell symlink that tried to execute `index.ts` as a plain shell script, causing a silent exit with code 1. The shebang ensures the file is executed by the Bun runtime.
+
 ## 0.6.1
 
 ### Fix
