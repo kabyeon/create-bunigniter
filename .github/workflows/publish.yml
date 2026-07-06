@@ -19,7 +19,7 @@ jobs:
         run: bun install
 
       - name: Check TypeScript
-        run: bunx tsc --noEmit index.ts
+        run: bunx tsc --noEmit
 
       - name: Publish
         run: npm publish --provenance --access public

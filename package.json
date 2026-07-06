@@ -9,8 +9,15 @@
 	"files": [
 		"index.ts"
 	],
-	"scripts": {},
+	"scripts": {
+		"check": "biome check .",
+		"check:fix": "biome check --write ."
+	},
 	"dependencies": {},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.2",
+		"@types/bun": "latest"
+	},
 	"keywords": [
 		"bunigniter",
 		"bun",

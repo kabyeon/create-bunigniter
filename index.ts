@@ -46,7 +46,9 @@ const installProc = Bun.spawn(["bun", "add", "bunigniter"], {
 const installExit = await installProc.exited;
 
 if (installExit !== 0) {
-	console.error("\x1b[31m❌ 패키지 설치 실패. 네트워크 연결을 확인하세요.\x1b[0m");
+	console.error(
+		"\x1b[31m❌ 패키지 설치 실패. 네트워크 연결을 확인하세요.\x1b[0m",
+	);
 	process.exit(1);
 }
 
