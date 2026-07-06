@@ -86,8 +86,9 @@ try {
 	};
 	pkg.type = pkg.type ?? "module";
 	pkg.devDependencies = pkg.devDependencies ?? {};
-	pkg.devDependencies["@types/bun"] = pkg.devDependencies["@types/bun"] ?? "latest";
-	writeFileSync(pkgPath, JSON.stringify(pkg, null, "\t") + "\n");
+	pkg.devDependencies["@types/bun"] =
+		pkg.devDependencies["@types/bun"] ?? "latest";
+	writeFileSync(pkgPath, `${JSON.stringify(pkg, null, "\t")}\n`);
 } catch (_e) {
 	console.error("\x1b[33m⚠ package.json scripts 병합 실패\x1b[0m");
 }
