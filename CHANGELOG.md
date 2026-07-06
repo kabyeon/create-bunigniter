@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3
+
+### Fix
+
+- **Remove manual `npm publish` to prevent CI conflict** — Previously, the version was manually published to npm before the GitHub Actions workflow ran, causing the CI publish step to fail with `E403 Forbidden` (duplicate version). This release is now published exclusively through the GitHub Actions workflow on release events.
+
 ## 0.6.2
 
 ### Fix

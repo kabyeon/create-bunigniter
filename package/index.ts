@@ -5,7 +5,7 @@
 // 내부적으로 bunigniter CLI의 init 명령어를 호출
 // ============================================================
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 const projectName = process.argv[2];
@@ -71,25 +71,6 @@ const initExit = await initProc.exited;
 if (initExit !== 0) {
 	console.error("\x1b[31m❌ 프로젝트 생성 실패\x1b[0m");
 	process.exit(1);
-}
-
-// package.json에 scripts 병합 (bun add가 먼저 package.json을 생성하므로 init에서 스킵됨)
-const pkgPath = join(targetDir, "package.json");
-try {
-	const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-	pkg.scripts = {
-		dev: "bun run --hot node_modules/bunigniter/system/core/bootstrap.ts",
-		start: "bun run node_modules/bunigniter/system/core/bootstrap.ts",
-		bi: "bun run node_modules/bunigniter/cli/index.ts",
-		migrate: "bun run database/migrate.ts",
-		...pkg.scripts,
-	};
-	pkg.type = pkg.type ?? "module";
-	pkg.devDependencies = pkg.devDependencies ?? {};
-	pkg.devDependencies["@types/bun"] = pkg.devDependencies["@types/bun"] ?? "latest";
-	writeFileSync(pkgPath, JSON.stringify(pkg, null, "\t") + "\n");
-} catch (_e) {
-	console.error("\x1b[33m⚠ package.json scripts 병합 실패\x1b[0m");
 }
 
 console.log("\x1b[36m다음 단계:\x1b[0m");
