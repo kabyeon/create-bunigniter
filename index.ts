@@ -38,7 +38,7 @@ try {
 
 // 프로젝트 디렉토리에 bunigniter 설치
 console.log("\x1b[2m📦 bunigniter 패키지 설치 중...\x1b[0m");
-const installProc = Bun.spawn(["bun", "add", "bunigniter"], {
+const installProc = Bun.spawn(["bun", "add", "bunigniter@^0.6"], {
 	cwd: targetDir,
 	stdout: "inherit",
 	stderr: "inherit",
