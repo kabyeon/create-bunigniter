@@ -1,5 +1,8 @@
 # create-bunigniter
 
+[![npm](https://img.shields.io/npm/v/create-bunigniter)](https://www.npmjs.com/package/create-bunigniter)
+[![CI](https://github.com/kabyeon/create-bunigniter/actions/workflows/ci.yml/badge.svg)](https://github.com/kabyeon/create-bunigniter/actions)
+
 **BunIgniter project scaffolding tool**
 
 Start a [BunIgniter](https://github.com/kabyeon/bunigniter) full-stack MVC project — a CodeIgniter 3-style Bun framework — with a single command.
